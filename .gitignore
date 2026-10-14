@@ -1,1 +1,5 @@
 accounts.json
+__pycache__/
+.nicegui/
+.nicegui_secret
+.pytest_cache/
