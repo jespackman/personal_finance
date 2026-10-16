@@ -107,10 +107,13 @@ def create_bill(account):
     bill_amount = ask_float("Please enter the bill amount: $", minimum = 0.01)
     recurring = input("Is this bill recurring? (Y/N) ").strip().upper() == "Y"
     rec_freq = 30
+    monthly = False
     if recurring:
-        rec_freq = ask_int("How often will this bill recur (days)? ")
+        monthly = input("Does it recur monthly (M) or every set number of days (D)? ").strip().upper() != "D"
+        if not monthly:
+            rec_freq = ask_int("How often will this bill recur (days)? ")
     due_date = ask_future_date("Please enter the bill's due date (YYYY-MM-DD): ")
-    account.add_bill(bill_name, bill_amount, due_date, recurring, rec_freq)
+    account.add_bill(bill_name, bill_amount, due_date, recurring, rec_freq, monthly)
 
 
 #Call spending instance and ensure all inputs are valid

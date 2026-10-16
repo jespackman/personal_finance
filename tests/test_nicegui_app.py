@@ -103,6 +103,33 @@ async def test_starting_balance_can_be_skipped(user: User):
     await user.should_see("$0.00")
 
 
+async def add_recurring_bill(user, name, repeat, days=None):
+    field(user, ui.input, "Bill name").value = name
+    field(user, ui.number, "Amount", 1).value = 100
+    user.find(kind=ui.checkbox, content="Recurring").elements.pop().value = True
+    user.find(kind=ui.radio).elements.pop().value = repeat
+    if days is not None:
+        field(user, ui.number, "Recurs every (days)").value = days
+    user.find(kind=ui.button, content="Add bill").click()
+    await user.should_see(f"Added bill '{name}'.")
+
+
+async def test_monthly_and_every_x_days_bills(user: User):
+    await sign_up(user)
+    await user.should_see("Account created!")
+    await add_recurring_bill(user, "Rent", "Monthly")
+    await add_recurring_bill(user, "Cleaner", "Every X days", days=14)
+    user.find(kind=ui.tab, content="Overview").click()
+    await user.should_see(kind=ui.table)
+    table = user.find(kind=ui.table).elements.pop()
+    assert {row["name"]: row["recurring"] for row in table.rows} == {"Rent": "Monthly", "Cleaner": "Every 14 days"}
+
+    data = json.load(open(TEST_DATA_FILE))
+    bills = {b["name"]: b for b in data["accounts"][data["identities"]["alice"]["account_id"]]["bills"]}
+    assert bills["Rent"]["monthly"] is True
+    assert bills["Cleaner"]["monthly"] is False and bills["Cleaner"]["frequency"] == 14
+
+
 async def test_full_flow(user: User):
     await sign_up(user, name="Nice Tester", username="nicetester", password="secretpass")
     await user.should_see("Account created! Welcome, Nice Tester.")

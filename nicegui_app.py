@@ -21,6 +21,11 @@ def current_account():
     return account_dir.get(app.storage.user.get("account_id"))
 
 
+#Choices for how a recurring bill repeats
+MONTHLY = "Monthly"
+EVERY_X_DAYS = "Every X days"
+
+
 def money(amount):
     return f"${amount:,.2f}"
 
@@ -141,7 +146,7 @@ def main_page():
                                       {"name": "due", "label": "Due", "field": "due", "sortable": True},
                                       {"name": "recurring", "label": "Recurring", "field": "recurring"}],
                              rows=[{"name": b.name, "amount": money(b.amount), "due": b.due_date.isoformat(),
-                                    "recurring": f"Every {b.frequency} days" if b.recurring else "No"}
+                                    "recurring": b.recurrence()}
                                    for b in sorted(account.bills, key=lambda b: b.due_date)]
                              ).classes("w-full").props("flat")
                 else:
@@ -208,7 +213,8 @@ def main_page():
         if due < date.today():
             ui.notify("The due date cannot be in the past.", type="warning")
             return
-        account.add_bill(name, float(bill_amount.value), due, bill_recurring.value, int(bill_frequency.value or 30))
+        account.add_bill(name, float(bill_amount.value), due, bill_recurring.value, int(bill_frequency.value or 30),
+                         monthly=bill_repeat.value == MONTHLY)
         bill_name.value = ""
         bill_amount.value = None
         changed(f"Added bill '{name}'.")
@@ -248,8 +254,11 @@ def main_page():
                 bill_due = ui.date(value=today.isoformat()).props(
                     f''':options="d => d >= '{today.strftime('%Y/%m/%d')}'"''')
                 bill_recurring = ui.checkbox("Recurring")
-                bill_frequency = ui.number("Recurs every (days)", value=30, min=1, step=1, format="%d"
-                                           ).classes("w-full").bind_visibility_from(bill_recurring, "value")
+                with ui.column().classes("w-full gap-0").bind_visibility_from(bill_recurring, "value"):
+                    bill_repeat = ui.radio([MONTHLY, EVERY_X_DAYS], value=MONTHLY).props("inline")
+                    bill_frequency = ui.number("Recurs every (days)", value=30, min=1, step=1, format="%d"
+                                               ).classes("w-full").bind_visibility_from(
+                                                   bill_repeat, "value", backward=lambda v: v == EVERY_X_DAYS)
                 ui.button("Add bill", on_click=add_bill)
 
         with ui.tab_panel(spending_tab):

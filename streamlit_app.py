@@ -69,7 +69,7 @@ def overview_tab(account):
         st.subheader("Upcoming bills")
         if account.bills:
             st.dataframe(pd.DataFrame([{"Name": b.name, "Amount": b.amount, "Due": b.due_date,
-                                        "Recurring": f"Every {b.frequency} days" if b.recurring else "No"}
+                                        "Recurring": b.recurrence()}
                                        for b in sorted(account.bills, key=lambda b: b.due_date)]),
                          hide_index=True, column_config={"Amount": st.column_config.NumberColumn(format="$%.2f")})
         else:
@@ -91,12 +91,15 @@ def bill_tab(account):
         amount = st.number_input("Amount ($)", min_value=0.01, step=10.0, format="%.2f")
         due_date = st.date_input("Due date", min_value=date.today())
         recurring = st.checkbox("Recurring")
-        frequency = st.number_input("Recurs every (days)", min_value=1, value=30, step=1)
+        repeat = st.radio("Repeats", ["Monthly", "Every X days"], horizontal=True,
+                          help="Monthly bills repeat on the same day each month")
+        frequency = st.number_input("Recurs every (days)", min_value=1, value=30, step=1,
+                                    help='Only used for "Every X days"')
         if st.form_submit_button("Add bill"):
             if not name.strip():
                 st.error("Please enter a bill name.")
             else:
-                account.add_bill(name.strip(), amount, due_date, recurring, int(frequency))
+                account.add_bill(name.strip(), amount, due_date, recurring, int(frequency), monthly=repeat == "Monthly")
                 save()
                 st.success(f"Added bill '{name.strip()}'.")
 

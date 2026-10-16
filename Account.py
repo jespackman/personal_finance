@@ -47,8 +47,8 @@ class Account:
 
 
     #Add bill; it is recorded as spending once it is actually charged in update_balance
-    def add_bill(self, bill_name, amount: float, due_date: date, recurring = False, frequency = 30):
-        self.bills.append(Bill(bill_name, amount, due_date, recurring=recurring, frequency=frequency))
+    def add_bill(self, bill_name, amount: float, due_date: date, recurring = False, frequency = 30, monthly = False):
+        self.bills.append(Bill(bill_name, amount, due_date, recurring=recurring, frequency=frequency, monthly=monthly))
 
 
     #Charge every bill that has come due, including missed cycles of recurring bills
