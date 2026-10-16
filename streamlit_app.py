@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 from Recommendation import Recommendation
-from storage import load_data, save_data, account_exists, login, create_account
+from storage import load_data, save_data, login, create_account, signup_error
 
 
 st.set_page_config(page_title="Finance App", page_icon="💰", layout="wide")
@@ -23,12 +23,12 @@ def login_page():
 
     with login_tab:
         with st.form("login"):
-            name = st.text_input("Name")
-            id_num = st.text_input("Account number", type="password")
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
             if st.form_submit_button("Log in"):
-                account = login(identity_dir, account_dir, name, id_num)
+                account = login(identity_dir, account_dir, username, password)
                 if account is None:
-                    st.error("Name or account number is incorrect.")
+                    st.error("Username or password is incorrect.")
                 else:
                     st.session_state.account_id = account.id_num
                     st.rerun()
@@ -36,13 +36,15 @@ def login_page():
     with create_tab:
         with st.form("create"):
             name = st.text_input("Name")
+            username = st.text_input("Username", help="3 to 20 letters, numbers or underscores")
+            password = st.text_input("Password", type="password", help="At least 8 characters")
+            confirm = st.text_input("Confirm password", type="password")
             if st.form_submit_button("Create account"):
-                if not name.strip():
-                    st.error("Please enter your name.")
-                elif account_exists(identity_dir, name):
-                    st.error("An account with that name already exists.")
+                error = signup_error(identity_dir, name, username, password, confirm)
+                if error:
+                    st.error(error)
                 else:
-                    account = create_account(identity_dir, account_dir, name)
+                    account = create_account(identity_dir, account_dir, name, username, password)
                     st.session_state.account_id = account.id_num
                     st.session_state.new_account = True
                     st.rerun()
@@ -128,15 +130,14 @@ def account_page(account):
     pages = {"Overview": overview_tab, "Deposit": deposit_tab, "Bills": bill_tab,
              "Spending": spending_tab, "Recommendations": recommendations_tab}
     with st.sidebar:
-        st.header(account.name.title())
-        st.caption(f"Account #{account.id_num}")
+        st.header(account.name)
         choice = st.radio("Go to", list(pages), label_visibility="collapsed")
         if st.button("Log out"):
             del st.session_state.account_id
             st.rerun()
 
     if st.session_state.pop("new_account", False):
-        st.success(f"Account created! Your account number is **{account.id_num}**. Keep it to log in.")
+        st.success(f"Account created! Welcome, {account.name}.")
 
     st.title(choice)
     pages[choice](account)

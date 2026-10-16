@@ -5,7 +5,7 @@ from datetime import date
 from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 from Recommendation import Recommendation
-from storage import load_data, save_data, account_exists, login, create_account
+from storage import load_data, save_data, login, create_account, signup_error
 
 
 #The server stays running, so load once and keep the data in memory
@@ -16,7 +16,7 @@ def save():
     save_data(identity_dir, account_dir)
 
 
-#The logged-in account number is kept in the browser's session storage
+#The logged-in account's id is kept in the browser's session storage
 def current_account():
     return account_dir.get(app.storage.user.get("account_id"))
 
@@ -32,22 +32,21 @@ def login_page():
         return RedirectResponse("/")
 
     def do_login():
-        account = login(identity_dir, account_dir, login_name.value, login_id.value)
+        account = login(identity_dir, account_dir, login_username.value or "", login_password.value or "")
         if account is None:
-            ui.notify("Name or account number is incorrect.", type="negative")
+            ui.notify("Username or password is incorrect.", type="negative")
             return
         app.storage.user["account_id"] = account.id_num
         ui.navigate.to("/")
 
     def do_create():
-        name = new_name.value or ""
-        if not name.strip():
-            ui.notify("Please enter your name.", type="warning")
+        name, username = new_name.value or "", new_username.value or ""
+        password, confirm = new_password.value or "", new_confirm.value or ""
+        error = signup_error(identity_dir, name, username, password, confirm)
+        if error:
+            ui.notify(error, type="negative")
             return
-        if account_exists(identity_dir, name):
-            ui.notify("An account with that name already exists.", type="negative")
-            return
-        account = create_account(identity_dir, account_dir, name)
+        account = create_account(identity_dir, account_dir, name, username, password)
         app.storage.user["account_id"] = account.id_num
         app.storage.user["new_account"] = True
         ui.navigate.to("/")
@@ -60,11 +59,18 @@ def login_page():
                 create_tab = ui.tab("Create account")
             with ui.tab_panels(tabs, value=login_tab).classes("w-full"):
                 with ui.tab_panel(login_tab).classes("gap-2"):
-                    login_name = ui.input("Name").classes("w-full")
-                    login_id = ui.input("Account number", password=True).classes("w-full").on("keydown.enter", do_login)
+                    login_username = ui.input("Username").classes("w-full")
+                    login_password = ui.input("Password", password=True, password_toggle_button=True
+                                              ).classes("w-full").on("keydown.enter", do_login)
                     ui.button("Log in", on_click=do_login).classes("w-full")
                 with ui.tab_panel(create_tab).classes("gap-2"):
-                    new_name = ui.input("Name").classes("w-full").on("keydown.enter", do_create)
+                    new_name = ui.input("Name").classes("w-full")
+                    new_username = ui.input("Username").props('hint="3 to 20 letters, numbers or underscores"'
+                                                              ).classes("w-full")
+                    new_password = ui.input("Password", password=True, password_toggle_button=True
+                                            ).props('hint="At least 8 characters"').classes("w-full")
+                    new_confirm = ui.input("Confirm password", password=True
+                                           ).classes("w-full").on("keydown.enter", do_create)
                     ui.button("Create account", on_click=do_create).classes("w-full")
 
 
@@ -81,14 +87,12 @@ def main_page():
         ui.navigate.to("/login")
 
     with ui.header().classes("items-center justify-between"):
-        ui.label(f"💰 {account.name.title()}").classes("text-xl font-bold")
-        with ui.row().classes("items-center"):
-            ui.label(f"Account #{account.id_num}").classes("opacity-80")
-            ui.button("Log out", on_click=logout).props("flat color=white")
+        ui.label(f"💰 {account.name}").classes("text-xl font-bold")
+        ui.button("Log out", on_click=logout).props("flat color=white")
 
     if app.storage.user.pop("new_account", False):
         with ui.card().classes("w-full bg-green-1"):
-            ui.label(f"Account created! Your account number is {account.id_num}. Keep it to log in.")
+            ui.label(f"Account created! Welcome, {account.name}.")
 
     #Sections that show account data are refreshable so they update after every change
     @ui.refreshable

@@ -11,12 +11,25 @@ def field(user, kind, label, index=0):
     return found[index]
 
 
-async def create_account(user, name):
+async def sign_up(user, name="Alice", username="alice", password="password123", confirm=None):
     await user.open("/")
     await user.should_see("Log in")
-    field(user, ui.input, "Name", 1).value = name
+    field(user, ui.input, "Name").value = name
+    field(user, ui.input, "Username", 1).value = username
+    field(user, ui.input, "Password", 1).value = password
+    field(user, ui.input, "Confirm password").value = password if confirm is None else confirm
     user.find(kind=ui.button, content="Create account").click()
-    await user.should_see("Account created!")
+
+
+async def log_in(user, username, password):
+    field(user, ui.input, "Username", 0).value = username
+    field(user, ui.input, "Password", 0).value = password
+    user.find(kind=ui.button, content="Log in").click()
+
+
+async def log_out(user):
+    user.find("Log out").click()
+    await user.should_see("Log in")
 
 
 async def test_redirects_to_login_when_logged_out(user: User):
@@ -25,27 +38,48 @@ async def test_redirects_to_login_when_logged_out(user: User):
     await user.should_not_see("Balance")
 
 
-async def test_wrong_account_number_is_rejected(user: User):
-    await create_account(user, "alice")
-    user.find("Log out").click()
-    await user.should_see("Log in")
-    field(user, ui.input, "Name", 0).value = "alice"
-    field(user, ui.input, "Account number").value = "123"
-    user.find(kind=ui.button, content="Log in").click()
-    await user.should_see("Name or account number is incorrect.")
+async def test_wrong_password_is_rejected(user: User):
+    await sign_up(user)
+    await user.should_see("Account created!")
+    await log_out(user)
+    await log_in(user, "alice", "wrongpassword")
+    await user.should_see("Username or password is incorrect.")
 
 
-async def test_duplicate_name_is_rejected(user: User):
-    await create_account(user, "alice")
-    user.find("Log out").click()
-    await user.should_see("Log in")
-    field(user, ui.input, "Name", 1).value = "ALICE"
-    user.find(kind=ui.button, content="Create account").click()
-    await user.should_see("An account with that name already exists.")
+async def test_duplicate_username_is_rejected(user: User):
+    await sign_up(user)
+    await user.should_see("Account created!")
+    await log_out(user)
+    await sign_up(user, name="Someone Else", username="ALICE")
+    await user.should_see("That username is already taken.")
+
+
+async def test_two_people_can_share_a_name(user: User):
+    await sign_up(user, name="Alex", username="alex1")
+    await user.should_see("Account created!")
+    await log_out(user)
+    await sign_up(user, name="Alex", username="alex2")
+    await user.should_see("Account created!")
+
+
+async def test_signup_validation(user: User):
+    await sign_up(user, username="a b")
+    await user.should_see("Username can only contain letters, numbers and underscores.")
+    await sign_up(user, password="short")
+    await user.should_see("Password must be at least 8 characters.")
+    await sign_up(user, confirm="different123")
+    await user.should_see("Passwords do not match.")
+
+
+async def test_password_is_not_stored_in_plain_text(user: User):
+    await sign_up(user)
+    await user.should_see("Account created!")
+    assert "password123" not in open(TEST_DATA_FILE).read()
 
 
 async def test_full_flow(user: User):
-    await create_account(user, "nicetester")
+    await sign_up(user, name="Nice Tester", username="nicetester", password="secretpass")
+    await user.should_see("Account created! Welcome, Nice Tester.")
 
     field(user, ui.number, "Amount", 0).value = 300
     user.find(kind=ui.button, content="Deposit").click()
@@ -69,17 +103,15 @@ async def test_full_flow(user: User):
 
     #Everything was saved to disk
     data = json.load(open(TEST_DATA_FILE))
-    saved = data["accounts"][data["identities"]["NICETESTER"]]
+    saved = data["accounts"][data["identities"]["nicetester"]["account_id"]]
+    assert saved["name"] == "Nice Tester"
     assert saved["deposits"][0]["amount"] == 300
     assert saved["balance"] == 260
     assert saved["spendings"][0]["category"] == "Groceries"
     assert saved["bills"][0]["name"] == "Rent"
 
-    #Log out and back in with the account number
-    user.find("Log out").click()
-    await user.should_see("Log in")
-    field(user, ui.input, "Name", 0).value = "NiceTester"
-    field(user, ui.input, "Account number").value = data["identities"]["NICETESTER"]
-    user.find(kind=ui.button, content="Log in").click()
+    #Log out and back in (usernames are case-insensitive)
+    await log_out(user)
+    await log_in(user, "NiceTester", "secretpass")
     await user.should_see("Rent")
     await user.should_see("Groceries")

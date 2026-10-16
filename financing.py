@@ -1,7 +1,8 @@
 #Import Classes
 from datetime import datetime, date
+from getpass import getpass
 from Recommendation import Recommendation
-from storage import load_data, save_data, account_exists, login, create_account
+from storage import load_data, save_data, username_taken, username_error, password_error, login, create_account
 
 
 #Load data in from json and make usable
@@ -50,22 +51,39 @@ def ask_future_date(prompt):
 
 #Create Account Function
 def create_or_login():
-    name = input("Welcome! Please enter your name: ")
-    if account_exists(identity_dir, name):
+    username = input("Welcome! Please enter your username: ")
+    if username_taken(identity_dir, username):
         while True:
-            id_num = input("Please enter your account number (or press Enter to cancel): ").strip()
-            if id_num == "":
+            password = getpass("Please enter your password (or press Enter to cancel): ")
+            if password == "":
                 return None
-            account = login(identity_dir, account_dir, name, id_num)
+            account = login(identity_dir, account_dir, username, password)
             if account is not None:
                 return account
-            print("Account number incorrect. Please try again.")
-    answer = input("You do not have an account. Would you like to create one? ")
+            print("Password incorrect. Please try again.")
+    answer = input("There is no account with that username. Would you like to create one? ")
     if answer.upper().strip() not in ("YES", "Y"):
         print("Returning to login screen...")
         return None
-    account = create_account(identity_dir, account_dir, name)
-    print(f"Account created! Your account number is {account.id_num}.")
+    while username_error(username):
+        print(username_error(username))
+        username = input("Please choose a username: ")
+        if username_taken(identity_dir, username):
+            print("That username is already taken.")
+            username = ""
+    name = input("Please enter your name: ").strip()
+    while not name:
+        name = input("Please enter your name: ").strip()
+    while True:
+        password = getpass("Please choose a password: ")
+        if password_error(password):
+            print(password_error(password))
+        elif getpass("Please confirm your password: ") != password:
+            print("Passwords do not match.")
+        else:
+            break
+    account = create_account(identity_dir, account_dir, name, username, password)
+    print(f"Account created! Welcome, {account.name}.")
     return account
 
 #Call summarize function and print
