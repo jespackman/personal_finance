@@ -6,20 +6,29 @@ from Spending import Spending
 class Account:
 
     #Initiate a class taking name as a string, account number, bills as a list of Bill,
-    # spendings as a list of Spending, starting balance, and deposits as a list of (amount, date)
-    def __init__(self, name, id_num, bills = None, spendings = None, balance = 0, deposits = None):
+    # spendings as a list of Spending, current balance, deposits as a list of (amount, date),
+    # and the balance the account was opened with
+    def __init__(self, name, id_num, bills = None, spendings = None, balance = 0, deposits = None, starting_balance = 0):
         self.name = name
         self.id_num = id_num
         self.bills = bills if bills is not None else []
         self.spendings = spendings if spendings is not None else []
         self.balance = float(balance)
         self.deposits = deposits if deposits is not None else []
+        self.starting_balance = float(starting_balance)
 
 
     #Expected monthly income: last month's deposits, falling back to the overall monthly average
     @property
     def predicted_income(self):
         return self.last_month_income() or self.average_income()
+
+
+    #Money already in the account when it was opened; not a deposit, so it does not count as income
+    def set_starting_balance(self, amount):
+        self.balance += amount - self.starting_balance
+        self.starting_balance = amount
+        return self.balance
 
 
     #Manually added money to balance
@@ -122,6 +131,7 @@ class Account:
     #Store accounts as dictionaries
     def acc_to_dict(self):
         return {"name": self.name, "id_num": self.id_num, "balance": self.balance,
+                "starting_balance": self.starting_balance,
                 "bills": [bill.to_dict() for bill in self.bills],
                 "spendings": [spending.to_dict() for spending in self.spendings],
                 "deposits": [{"amount": amount, "date": add_date.isoformat()} for amount, add_date in self.deposits]}
@@ -134,4 +144,4 @@ class Account:
         spendings = [Spending.from_dict(spending) for spending in data.get("spendings", [])]
         deposits = [(dep["amount"], date.fromisoformat(dep["date"])) for dep in data.get("deposits", [])]
         return Account(data["name"], data["id_num"], balance = data.get("balance", 0), bills = bills,
-                       spendings = spendings, deposits = deposits)
+                       spendings = spendings, deposits = deposits, starting_balance = data.get("starting_balance", 0))

@@ -90,9 +90,25 @@ def main_page():
         ui.label(f"💰 {account.name}").classes("text-xl font-bold")
         ui.button("Log out", on_click=logout).props("flat color=white")
 
+    #Right after sign-up, ask how much is already in the account (not counted as income)
     if app.storage.user.pop("new_account", False):
-        with ui.card().classes("w-full bg-green-1"):
-            ui.label(f"Account created! Welcome, {account.name}.")
+        def set_starting_balance():
+            if starting_amount.value is None or starting_amount.value < 0:
+                ui.notify("Please enter an amount of $0.00 or more.", type="warning")
+                return
+            account.set_starting_balance(float(starting_amount.value))
+            welcome.delete()
+            changed(f"Starting balance set to {money(account.balance)}.")
+
+        with ui.card().classes("w-full max-w-5xl mx-auto bg-green-1") as welcome:
+            ui.label(f"Account created! Welcome, {account.name}.").classes("text-lg font-bold")
+            ui.label("How much money is already in this account? "
+                     "This sets your starting balance and won't count as income.")
+            with ui.row().classes("items-center"):
+                starting_amount = ui.number("Starting balance", prefix="$", min=0, step=10, format="%.2f"
+                                            ).on("keydown.enter", set_starting_balance)
+                ui.button("Set starting balance", on_click=set_starting_balance)
+                ui.button("Skip", on_click=welcome.delete).props("flat")
 
     #Sections that show account data are refreshable so they update after every change
     @ui.refreshable
@@ -156,6 +172,9 @@ def main_page():
         rows += [{"date": s.date.isoformat(), "type": "Spending", "description": s.category, "amount": money(-s.amount)}
                  for s in account.spendings]
         rows.sort(key=lambda row: row["date"], reverse=True)
+        if account.starting_balance:
+            rows.append({"date": "", "type": "Starting balance", "description": "Opening balance",
+                         "amount": money(account.starting_balance)})
         if not rows:
             ui.label("No transactions yet.").classes("opacity-70")
             return

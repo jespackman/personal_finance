@@ -77,6 +77,32 @@ async def test_password_is_not_stored_in_plain_text(user: User):
     assert "password123" not in open(TEST_DATA_FILE).read()
 
 
+async def test_starting_balance_is_not_income(user: User):
+    await sign_up(user)
+    await user.should_see("How much money is already in this account?")
+    field(user, ui.number, "Starting balance").value = 1000
+    user.find(kind=ui.button, content="Set starting balance").click()
+    await user.should_see("Starting balance set to $1,000.00.")
+    await user.should_not_see("How much money is already in this account?")
+    field(user, ui.number, "Amount", 0).value = 200
+    user.find(kind=ui.button, content="Deposit").click()
+    await user.should_see("Your balance is now $1,200.00")
+
+    data = json.load(open(TEST_DATA_FILE))
+    saved = data["accounts"][data["identities"]["alice"]["account_id"]]
+    assert saved["balance"] == 1200
+    assert saved["starting_balance"] == 1000
+    assert [d["amount"] for d in saved["deposits"]] == [200]
+
+
+async def test_starting_balance_can_be_skipped(user: User):
+    await sign_up(user)
+    await user.should_see("How much money is already in this account?")
+    user.find(kind=ui.button, content="Skip").click()
+    await user.should_not_see("How much money is already in this account?")
+    await user.should_see("$0.00")
+
+
 async def test_full_flow(user: User):
     await sign_up(user, name="Nice Tester", username="nicetester", password="secretpass")
     await user.should_see("Account created! Welcome, Nice Tester.")

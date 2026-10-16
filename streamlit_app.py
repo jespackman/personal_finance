@@ -134,10 +134,24 @@ def account_page(account):
         choice = st.radio("Go to", list(pages), label_visibility="collapsed")
         if st.button("Log out"):
             del st.session_state.account_id
+            st.session_state.pop("new_account", None)
             st.rerun()
 
-    if st.session_state.pop("new_account", False):
+    #Right after sign-up, ask how much is already in the account (not counted as income)
+    if st.session_state.get("new_account"):
         st.success(f"Account created! Welcome, {account.name}.")
+        with st.form("starting_balance"):
+            amount = st.number_input("How much money is already in this account? This sets your starting "
+                                     "balance and won't count as income.", min_value=0.0, step=10.0, format="%.2f")
+            set_col, skip_col = st.columns([1, 6])
+            if set_col.form_submit_button("Set"):
+                account.set_starting_balance(amount)
+                save()
+                del st.session_state.new_account
+                st.rerun()
+            if skip_col.form_submit_button("Skip"):
+                del st.session_state.new_account
+                st.rerun()
 
     st.title(choice)
     pages[choice](account)

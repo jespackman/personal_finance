@@ -84,6 +84,9 @@ def create_or_login():
             break
     account = create_account(identity_dir, account_dir, name, username, password)
     print(f"Account created! Welcome, {account.name}.")
+    #Money already in the account is the starting balance, not income
+    account.set_starting_balance(ask_float("How much money is already in this account? $", minimum = 0))
+    save_data(identity_dir, account_dir)
     return account
 
 #Call summarize function and print
